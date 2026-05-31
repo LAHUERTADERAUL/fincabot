@@ -13,9 +13,14 @@
     settings: "Ajustes"
   };
 
-  let state = ensureState(loadLocalState() || seedState());
+  const initialLocalState = loadLocalState();
+  let hasLocalState = Boolean(initialLocalState);
+  let state = ensureState(initialLocalState || seedState());
   let weather = { status: "idle" };
   let sheetSyncState = { status: "idle", message: "" };
+  let sheetStateSyncTimer = null;
+  let sheetStateSyncing = false;
+  let applyingRemoteSheetState = false;
   let notificationTimer = null;
   let supabaseClient = null;
   let supabaseConfigSignature = "";
@@ -37,7 +42,9 @@
     render();
     initCloud();
     loadWeather();
-    if (state.settings.appsScriptUrl) syncAppSheetNow(false);
+    if (state.settings.appsScriptUrl) {
+      loadSheetAppState(false).finally(() => syncAppSheetNow(false));
+    }
     scheduleDailyNotification();
   }
 
@@ -288,8 +295,10 @@
   function saveState(options = {}) {
     state.meta.updatedAt = new Date().toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    hasLocalState = true;
     if (options.render !== false) render();
     if (options.sync !== false) queueCloudSync();
+    if (options.sheet !== false) queueSheetStateSync();
     scheduleDailyNotification();
   }
 
@@ -353,6 +362,7 @@
     });
     byId("exportBtn").addEventListener("click", exportMemory);
     byId("updateAppBtn").addEventListener("click", updateAppCache);
+    byId("syncDataBtn").addEventListener("click", syncAllDataNow);
     byId("resetBtn").addEventListener("click", resetDemo);
     byId("quickActions").addEventListener("click", (event) => {
       const button = event.target.closest("button[data-prompt]");
@@ -764,6 +774,121 @@
     }
     const updated = state.meta?.sheetUpdatedAt ? ` - ${formatDate(state.meta.sheetUpdatedAt.slice(0, 10))}` : "";
     node.textContent = `PEDIDOS CAMPO conectado${updated}`;
+  }
+
+  function queueSheetStateSync() {
+    if (applyingRemoteSheetState || !state.settings.appsScriptUrl) return;
+    clearTimeout(sheetStateSyncTimer);
+    sheetStateSyncTimer = setTimeout(() => syncSheetAppState(false), 1800);
+  }
+
+  async function loadSheetAppState(manual) {
+    if (!state.settings.appsScriptUrl) {
+      if (manual) toast("Configura Apps Script URL");
+      return;
+    }
+    try {
+      const payload = await callAppsScript({ action: "loadState" }, 60000);
+      if (payload.ok === false) throw new Error(payload.error || "No se pudo cargar memoria");
+      if (!payload.exists || !payload.state) {
+        if (manual) toast("No hay datos remotos todavia");
+        return;
+      }
+      const remote = ensureState({
+        ...payload.state,
+        settings: {
+          ...payload.state.settings,
+          appsScriptUrl: state.settings.appsScriptUrl,
+          appsScriptToken: state.settings.appsScriptToken
+        }
+      });
+      const remoteUpdated = remote.meta?.updatedAt || payload.updatedAt || "";
+      const localUpdated = state.meta?.updatedAt || "";
+      if (!hasLocalState || remoteUpdated > localUpdated) {
+        applyingRemoteSheetState = true;
+        state = remote;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        hasLocalState = true;
+        render();
+        applyingRemoteSheetState = false;
+        if (manual) toast("Datos descargados");
+      } else if (hasLocalState && localUpdated > remoteUpdated) {
+        queueSheetStateSync();
+      }
+    } catch (error) {
+      if (manual) toast(`Datos: ${error.message}`);
+    }
+  }
+
+  async function syncSheetAppState(manual) {
+    if (!state.settings.appsScriptUrl || sheetStateSyncing) return;
+    sheetStateSyncing = true;
+    try {
+      const session = uid("sheetstate");
+      const json = JSON.stringify(buildAppStateForSheetSync());
+      const chunks = splitString(json, 1400);
+      await callAppsScript({ action: "beginState", session, total: String(chunks.length) }, 60000);
+      for (let index = 0; index < chunks.length; index += 1) {
+        await callAppsScript({ action: "stateChunk", session, index: String(index), total: String(chunks.length), data: chunks[index] }, 60000);
+      }
+      const result = await callAppsScript({ action: "commitState", session, total: String(chunks.length) }, 60000);
+      if (result.ok === false) throw new Error(result.error || "No se pudo guardar memoria");
+      if (manual) toast("Datos sincronizados");
+    } catch (error) {
+      if (manual) toast(`Datos: ${error.message}`);
+    } finally {
+      sheetStateSyncing = false;
+    }
+  }
+
+  function buildAppStateForSheetSync() {
+    const copy = JSON.parse(JSON.stringify(state));
+    copy.orders = [];
+    copy.harvestList = [];
+    return copy;
+  }
+
+  function splitString(text, size) {
+    const chunks = [];
+    for (let index = 0; index < text.length; index += size) {
+      chunks.push(text.slice(index, index + size));
+    }
+    return chunks;
+  }
+
+  function callAppsScript(params, timeoutMs = 30000) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `fincabotCall_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const url = new URL(state.settings.appsScriptUrl);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
+      });
+      url.searchParams.set("callback", callbackName);
+      if (state.settings.appsScriptToken) url.searchParams.set("token", state.settings.appsScriptToken);
+
+      const script = document.createElement("script");
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("Apps Script no respondio"));
+      }, timeoutMs);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        script.remove();
+        delete window[callbackName];
+      }
+
+      window[callbackName] = (payload) => {
+        cleanup();
+        resolve(payload);
+      };
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("No se pudo leer Apps Script"));
+      };
+      script.src = url.toString();
+      document.body.appendChild(script);
+    });
   }
 
   function renderObservations() {
@@ -1859,6 +1984,12 @@
     }
   }
 
+  async function syncAllDataNow() {
+    await loadSheetAppState(true);
+    await syncAppSheetNow(true);
+    await syncSheetAppState(true);
+  }
+
   async function enableNotifications() {
     if (!("Notification" in window)) {
       toast("Este navegador no soporta notificaciones");
@@ -2245,7 +2376,7 @@
       const available = isYes(firstValue(row, ["TEMPORADA/DISPONIBLE", "DISPONIBLE", "TEMPORADA", "Disponible"]));
       const existing = previousByKey.get(cropKey(externalId, name)) || findCropByExternalId(externalId) || findCropByName(name);
       const crop = existing || {
-        id: uid("crop"),
+        id: makeCropId(externalId, name),
         plot: "PEDIDOS CAMPO",
         plants: 1,
         stage: available ? "Produccion" : "Compra",
@@ -2361,6 +2492,12 @@
   function cropKey(externalId, name) {
     const id = String(externalId || "").trim();
     return id ? `id:${id}` : `name:${normalizeProductName(name)}`;
+  }
+
+  function makeCropId(externalId, name) {
+    const id = String(externalId || "").trim();
+    if (id) return `crop_${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    return `crop_${normalizeProductName(name).replace(/\s+/g, "_") || uid("crop")}`;
   }
 
   function dedupeCrops(crops) {
