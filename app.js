@@ -15,6 +15,7 @@
 
   let state = ensureState(loadLocalState() || seedState());
   let weather = { status: "idle" };
+  let sheetSyncState = { status: "idle", message: "" };
   let notificationTimer = null;
   let supabaseClient = null;
   let supabaseConfigSignature = "";
@@ -35,6 +36,7 @@
     render();
     initCloud();
     loadWeather();
+    if (state.settings.appsScriptUrl) syncAppSheetNow(false);
     scheduleDailyNotification();
   }
 
@@ -121,8 +123,6 @@
 
   function seedState() {
     const today = todayISO();
-    const tomatoId = uid("crop");
-    const lettuceId = uid("crop");
     return {
       version: 2,
       meta: { updatedAt: new Date().toISOString() },
@@ -138,7 +138,7 @@
         notificationsEnabled: false,
         appsScriptUrl: "",
         appsScriptToken: "",
-        sheetProductsTab: "PRODUCTOS DISPONIBLES",
+        sheetProductsTab: "PRODUCTOS",
         sheetOrdersTab: "VENTA",
         sheetSaleLinesTab: "VENTAS",
         sheetClientsTab: "CLIENTES",
@@ -153,67 +153,10 @@
           active: true
         }
       ],
-      crops: [
-        {
-          id: tomatoId,
-          name: "Tomate",
-          plot: "Invernadero 1",
-          plants: 80,
-          stage: "Produccion",
-          waterEveryDays: 2,
-          weedEveryDays: 12,
-          lastWatered: addDays(today, -2),
-          lastWeeded: addDays(today, -8),
-          yieldKgHour: 14,
-          source: "cultivated",
-          purchaseLeadDays: 3,
-          available: true
-        },
-        {
-          id: lettuceId,
-          name: "Lechuga",
-          plot: "Bancal 3",
-          plants: 160,
-          stage: "Produccion",
-          waterEveryDays: 1,
-          weedEveryDays: 9,
-          lastWatered: addDays(today, -1),
-          lastWeeded: addDays(today, -10),
-          yieldKgHour: 22,
-          source: "cultivated",
-          purchaseLeadDays: 3,
-          available: true
-        }
-      ],
+      crops: [],
       orders: [],
       harvestList: [],
-      fieldSections: [
-        {
-          id: uid("section"),
-          name: "Parcela norte",
-          notes: "Ejemplo editable",
-          rivers: [
-            {
-              id: uid("river"),
-              name: "Rio 1",
-              capacityPlants: 80,
-              cropId: tomatoId,
-              plantedPlants: 80,
-              plantedAt: addDays(today, -35),
-              notes: ""
-            },
-            {
-              id: uid("river"),
-              name: "Rio 2",
-              capacityPlants: 160,
-              cropId: lettuceId,
-              plantedPlants: 160,
-              plantedAt: addDays(today, -18),
-              notes: ""
-            }
-          ]
-        }
-      ],
+      fieldSections: [],
       products: [],
       tasks: [
         {
@@ -437,6 +380,7 @@
     renderObservations();
     renderChat();
     fillSettingsForm();
+    updateSheetStatus();
     updateCloudStatus();
   }
 
@@ -595,6 +539,13 @@
     const harvest = plan.items.filter((item) => item.action === "harvest");
     const purchases = plan.items.filter((item) => item.action === "purchase");
     const logistics = plan.items.filter((item) => item.action === "delivery");
+    if (!state.settings.appsScriptUrl) {
+      byId("harvestPurchaseBoard").innerHTML = `
+        <div class="empty-state">
+          Conecta PEDIDOS CAMPO en Ajustes. Sin esa URL no puedo leer pedidos, productos ni cultivos directamente de la base de datos.
+        </div>`;
+      return;
+    }
     byId("harvestPurchaseBoard").innerHTML = [
       renderMiniLane("Recolectar", harvest, "No hay recoleccion pendiente."),
       renderMiniLane("Comprar", purchases, "No hay compras avisadas."),
@@ -783,6 +734,26 @@
     }).join("") || `<div class="empty-state">No hay productos programados.</div>`;
   }
 
+  function updateSheetStatus() {
+    const node = byId("sheetStatus");
+    if (!node) return;
+    node.className = `sync-status ${sheetSyncState.status}`;
+    if (!state.settings.appsScriptUrl) {
+      node.textContent = "PEDIDOS CAMPO no conectado";
+      return;
+    }
+    if (sheetSyncState.status === "syncing") {
+      node.textContent = "Leyendo PEDIDOS CAMPO...";
+      return;
+    }
+    if (sheetSyncState.status === "error") {
+      node.textContent = `Error hoja: ${sheetSyncState.message}`;
+      return;
+    }
+    const updated = state.meta?.sheetUpdatedAt ? ` - ${formatDate(state.meta.sheetUpdatedAt.slice(0, 10))}` : "";
+    node.textContent = `PEDIDOS CAMPO conectado${updated}`;
+  }
+
   function renderObservations() {
     const recent = [...state.observations].slice(-8).reverse();
     byId("observationList").innerHTML = recent.map((observation) => {
@@ -828,7 +799,7 @@
     byId("settingNotifyHour").value = state.settings.notifyHour || "06:45";
     byId("settingSheetUrl").value = state.settings.appsScriptUrl || "";
     byId("settingSheetToken").value = state.settings.appsScriptToken || "";
-    byId("settingProductsTab").value = state.settings.sheetProductsTab || "PRODUCTOS DISPONIBLES";
+    byId("settingProductsTab").value = state.settings.sheetProductsTab || "PRODUCTOS";
     byId("settingOrdersTab").value = state.settings.sheetOrdersTab || "VENTA";
     byId("settingSaleLinesTab").value = state.settings.sheetSaleLinesTab || "VENTAS";
     byId("settingClientsTab").value = state.settings.sheetClientsTab || "CLIENTES";
@@ -1310,7 +1281,7 @@
     state.settings.notifyHour = byId("settingNotifyHour").value || "06:45";
     state.settings.appsScriptUrl = byId("settingSheetUrl").value.trim();
     state.settings.appsScriptToken = byId("settingSheetToken").value.trim();
-    state.settings.sheetProductsTab = byId("settingProductsTab").value.trim() || "PRODUCTOS DISPONIBLES";
+    state.settings.sheetProductsTab = byId("settingProductsTab").value.trim() || "PRODUCTOS";
     state.settings.sheetOrdersTab = byId("settingOrdersTab").value.trim() || "VENTA";
     state.settings.sheetSaleLinesTab = byId("settingSaleLinesTab").value.trim() || "VENTAS";
     state.settings.sheetClientsTab = byId("settingClientsTab").value.trim() || "CLIENTES";
@@ -1322,6 +1293,7 @@
     saveState();
     initCloud();
     loadWeather();
+    if (state.settings.appsScriptUrl) syncAppSheetNow(true);
     toast("Ajustes guardados");
   }
 
@@ -2152,21 +2124,30 @@
     const url = state.settings.appsScriptUrl;
     if (!url) {
       toast("Configura la URL de Apps Script en Ajustes");
+      updateSheetStatus();
       return;
     }
+    sheetSyncState = { status: "syncing", message: "" };
+    updateSheetStatus();
     try {
       const endpoint = new URL(url);
-      endpoint.searchParams.set("productsTab", state.settings.sheetProductsTab || "PRODUCTOS DISPONIBLES");
+      endpoint.searchParams.set("fincabot", "1");
+      endpoint.searchParams.set("productsTab", state.settings.sheetProductsTab || "PRODUCTOS");
       endpoint.searchParams.set("ordersTab", state.settings.sheetOrdersTab || "VENTA");
       endpoint.searchParams.set("saleLinesTab", state.settings.sheetSaleLinesTab || "VENTAS");
       endpoint.searchParams.set("clientsTab", state.settings.sheetClientsTab || "CLIENTES");
       endpoint.searchParams.set("harvestTab", state.settings.sheetHarvestTab || "LISTA RECOLECTA");
       if (state.settings.appsScriptToken) endpoint.searchParams.set("token", state.settings.appsScriptToken);
       const payload = await fetchSheetPayload(endpoint);
+      if (payload && payload.ok === false) throw new Error(payload.error || "Apps Script devolvio error");
       importAppSheetPayload(payload);
+      state.meta.sheetUpdatedAt = payload.updatedAt || new Date().toISOString();
+      sheetSyncState = { status: "ready", message: "" };
       saveState();
       if (manual) toast("PEDIDOS CAMPO sincronizado");
     } catch (error) {
+      sheetSyncState = { status: "error", message: error.message };
+      updateSheetStatus();
       toast(`Hoja: ${error.message}`);
     }
   }
@@ -2177,11 +2158,11 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
-      return loadJsonp(endpoint);
+      return loadJsonp(endpoint, error);
     }
   }
 
-  function loadJsonp(endpoint) {
+  function loadJsonp(endpoint, fetchError) {
     return new Promise((resolve, reject) => {
       const callbackName = `fincabotSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const url = new URL(endpoint.toString());
@@ -2189,8 +2170,9 @@
       const script = document.createElement("script");
       const timeout = setTimeout(() => {
         cleanup();
-        reject(new Error("No se pudo leer Apps Script"));
-      }, 20000);
+        const firstError = fetchError?.message ? ` Fetch: ${fetchError.message}.` : "";
+        reject(new Error(`Apps Script no llamo al callback.${firstError} Prueba la URL con ?test=1&callback=prueba y revisa que devuelva prueba({...}).`));
+      }, 60000);
       function cleanup() {
         clearTimeout(timeout);
         script.remove();
@@ -2219,15 +2201,18 @@
     importProducts(products);
     importHarvestList(harvest);
     importOrdersFromSales(sales, saleLines, clients);
+    syncCropPlantsFromFieldPlan();
   }
 
   function importProducts(rows) {
+    const previousByKey = new Map(state.crops.map((crop) => [cropKey(crop.externalId, crop.name), crop]));
+    const nextCrops = [];
     rows.forEach((row) => {
       const externalId = firstValue(row, ["Nº PRODUCTO", "N PRODUCTO", "ID", "id"]);
       const name = firstValue(row, ["PRODUCTO", "Producto", "producto"]);
       if (!name) return;
       const available = isYes(firstValue(row, ["TEMPORADA/DISPONIBLE", "DISPONIBLE", "TEMPORADA", "Disponible"]));
-      const existing = findCropByExternalId(externalId) || findCropByName(name);
+      const existing = previousByKey.get(cropKey(externalId, name)) || findCropByExternalId(externalId) || findCropByName(name);
       const crop = existing || {
         id: uid("crop"),
         plot: "PEDIDOS CAMPO",
@@ -2243,9 +2228,13 @@
       crop.name = cleanProductName(name);
       crop.externalId = String(externalId || crop.externalId || "");
       crop.available = available;
+      crop.fromDatabase = true;
+      crop.plot = crop.plot || "PEDIDOS CAMPO";
       if (!existing) crop.source = available ? "cultivated" : "purchased";
-      upsert(state.crops, crop);
+      nextCrops.push(crop);
     });
+    state.crops = dedupeCrops(nextCrops);
+    clearMissingCropsFromFieldPlan();
   }
 
   function importHarvestList(rows) {
@@ -2272,6 +2261,7 @@
   }
 
   function importOrdersFromSales(sales, saleLines, clients) {
+    state.orders = [];
     if (!sales.length || !saleLines.length) return;
     const saleMap = new Map(sales.map((sale) => [String(firstValue(sale, ["Nº PAQUETE", "N PAQUETE", "Nº FACTURA", "N FACTURA"]) || ""), sale]));
     const clientMap = new Map(clients.map((client) => [String(firstValue(client, ["Nº CLIENTE", "N CLIENTE", "CLIENTE"]) || ""), client]));
@@ -2309,8 +2299,7 @@
       });
     });
 
-    const manualOrders = state.orders.filter((order) => !order.id.startsWith("order_"));
-    const existingById = new Map(manualOrders.map((order) => [order.id, order]));
+    const existingById = new Map();
     imported.forEach((order) => existingById.set(order.id, order));
     state.orders = [...existingById.values()];
   }
@@ -2336,6 +2325,33 @@
     if (match) return toISO(new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])));
     if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
     return todayISO();
+  }
+
+  function cropKey(externalId, name) {
+    const id = String(externalId || "").trim();
+    return id ? `id:${id}` : `name:${normalizeProductName(name)}`;
+  }
+
+  function dedupeCrops(crops) {
+    const seen = new Set();
+    return crops.filter((crop) => {
+      const key = cropKey(crop.externalId, crop.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function clearMissingCropsFromFieldPlan() {
+    const ids = new Set(state.crops.map((crop) => crop.id));
+    state.fieldSections.forEach((section) => {
+      section.rivers.forEach((river) => {
+        if (river.cropId && !ids.has(river.cropId)) {
+          river.cropId = "";
+          river.plantedPlants = 0;
+        }
+      });
+    });
   }
 
   function isYes(value) {
