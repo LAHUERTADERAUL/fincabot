@@ -100,7 +100,10 @@
                 <p class="eyebrow">AppSheet</p>
                 <h2>Recoleccion y compras</h2>
               </div>
-              <button class="secondary-button" id="sheetSyncBtn">Sincronizar hoja</button>
+              <div class="topbar-actions">
+                <span class="sync-status" id="sheetStatus">Base no conectada</span>
+                <button class="secondary-button" id="sheetSyncBtn">Sincronizar hoja</button>
+              </div>
             </div>
             <div id="harvestPurchaseBoard" class="schedule-board"></div>
           </section>
@@ -409,7 +412,7 @@
               <label>Hora aviso<input id="settingNotifyHour" type="time"></label>
               <label>Apps Script URL<input id="settingSheetUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
               <label>Token hoja<input id="settingSheetToken" placeholder="Opcional, el mismo del Apps Script"></label>
-              <label>Pestana productos<input id="settingProductsTab" placeholder="PRODUCTOS DISPONIBLES"></label>
+              <label>Pestana productos<input id="settingProductsTab" placeholder="PRODUCTOS"></label>
               <label>Pestana pedidos<input id="settingOrdersTab" placeholder="VENTA"></label>
               <label>Pestana lineas pedido<input id="settingSaleLinesTab" placeholder="VENTAS"></label>
               <label>Pestana clientes<input id="settingClientsTab" placeholder="CLIENTES"></label>
@@ -434,6 +437,7 @@
               </div>
             </div>
             <div class="settings-actions">
+              <button class="secondary-button" id="updateAppBtn">Actualizar app</button>
               <button class="secondary-button" id="exportBtn">Exportar memoria</button>
               <label class="secondary-button import-label">Importar memoria<input id="importInput" type="file" accept="application/json"></label>
               <button class="danger-button" id="resetBtn">Reiniciar demo</button>

@@ -651,6 +651,33 @@ textarea:focus-visible {
   border-color: rgba(31, 122, 77, 0.45);
 }
 
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #f3f6f8;
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.sync-status.ready {
+  color: var(--green-deep);
+  background: var(--green-soft);
+}
+
+.sync-status.syncing {
+  color: #174f9e;
+  background: var(--blue-soft);
+}
+
+.sync-status.error {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
 .danger-button {
   color: var(--red);
 }
