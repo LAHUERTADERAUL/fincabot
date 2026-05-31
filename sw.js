@@ -1,4 +1,4 @@
-const CACHE_NAME = "fincabot-v7";
+const CACHE_NAME = "fincabot-v8";
 const ASSETS = [
   "./",
   "./index.html",

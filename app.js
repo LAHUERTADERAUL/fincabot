@@ -28,6 +28,7 @@
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
+    applyStaticConfig();
     registerServiceWorker();
     setupNavigation();
     setupForms();
@@ -290,6 +291,16 @@
     if (options.render !== false) render();
     if (options.sync !== false) queueCloudSync();
     scheduleDailyNotification();
+  }
+
+  function applyStaticConfig() {
+    const config = window.FINCABOT_CLOUD || {};
+    if (!state.settings.appsScriptUrl && config.appsScriptUrl) {
+      state.settings.appsScriptUrl = config.appsScriptUrl;
+    }
+    if (!state.settings.appsScriptToken && config.appsScriptToken) {
+      state.settings.appsScriptToken = config.appsScriptToken;
+    }
   }
 
   function setupNavigation() {
