@@ -1,0 +1,17 @@
+{
+  "name": "FincaBot",
+  "short_name": "FincaBot",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#1f7a4d",
+  "description": "Asistente local para organizar cultivos, pedidos, riegos, productos ecologicos y tareas de finca.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

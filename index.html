@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f7a4d">
+    <title>FincaBot</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <div class="brand">
+          <img src="icon.svg" alt="" width="36" height="36">
+          <div>
+            <strong>FincaBot</strong>
+            <span id="farmNameLabel">Asistente agricola</span>
+          </div>
+        </div>
+
+        <nav class="nav-stack" data-nav>
+          <button class="nav-button is-active" data-view="dashboard">Resumen</button>
+          <button class="nav-button" data-view="assistant">Asistente</button>
+          <button class="nav-button" data-view="crops">Cultivos</button>
+          <button class="nav-button" data-view="orders">Pedidos</button>
+          <button class="nav-button" data-view="team">Equipo</button>
+          <button class="nav-button" data-view="tasks">Tareas</button>
+          <button class="nav-button" data-view="products">Productos</button>
+          <button class="nav-button" data-view="photo">Foto</button>
+          <button class="nav-button" data-view="settings">Ajustes</button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayLabel">Hoy</p>
+            <h1 id="viewTitle">Resumen</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="refreshWeatherBtn" title="Actualizar clima" aria-label="Actualizar clima">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.6 4.5M4 12A8 8 0 0 1 18.6 7.5M17 7h3V4M7 17H4v3"/></svg>
+            </button>
+            <button class="icon-button" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="view is-active" id="view-dashboard" aria-labelledby="viewTitle">
+          <div class="dashboard-grid">
+            <section class="panel plan-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Prioridad</p>
+                  <h2>Plan de hoy</h2>
+                </div>
+                <button class="secondary-button" id="copyPlanBtn">Copiar resumen</button>
+              </div>
+              <div class="stats-row" id="todayStats"></div>
+              <div class="assistant-note" id="dailyAdvice"></div>
+            </section>
+
+            <section class="panel weather-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Campo</p>
+                  <h2>Clima y riesgo</h2>
+                </div>
+              </div>
+              <div id="weatherSummary" class="weather-summary"></div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Agenda</p>
+                <h2>Personas y tiempo</h2>
+              </div>
+            </div>
+            <div id="scheduleBoard" class="schedule-board"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Parcelas</p>
+                <h2>Estado de cultivos</h2>
+              </div>
+            </div>
+            <div id="cropMap" class="crop-map"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">AppSheet</p>
+                <h2>Recoleccion y compras</h2>
+              </div>
+              <button class="secondary-button" id="sheetSyncBtn">Sincronizar hoja</button>
+            </div>
+            <div id="harvestPurchaseBoard" class="schedule-board"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-assistant" aria-labelledby="assistantTitle">
+          <section class="panel assistant-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Memoria local</p>
+                <h2 id="assistantTitle">Asistente</h2>
+              </div>
+              <button class="secondary-button" id="clearChatBtn">Limpiar chat</button>
+            </div>
+            <div class="quick-actions" id="quickActions">
+              <button data-prompt="Que debo hacer hoy">Plan de hoy</button>
+              <button data-prompt="Que debo recolectar hoy">Recolectar</button>
+              <button data-prompt="Que cultivos hay que regar">Riego</button>
+              <button data-prompt="Que producto ecologico toca">Producto</button>
+              <button data-prompt="Organiza arreglos de la finca">Arreglos</button>
+            </div>
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+            <form class="chat-form" id="chatForm">
+              <input id="chatInput" autocomplete="off" placeholder="Pregunta por el plan, riego, pedidos, productos o hierbas">
+              <button type="submit">Enviar</button>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="view-crops" aria-labelledby="cropsTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Base</p>
+                <h2 id="cropsTitle">Cultivos</h2>
+              </div>
+            </div>
+            <form class="data-form" id="cropForm">
+              <input type="hidden" id="cropEditId">
+              <label>Nombre<input id="cropName" required placeholder="Tomate"></label>
+              <label>Parcela<input id="cropPlot" required placeholder="Invernadero 1"></label>
+              <label>Origen
+                <select id="cropSource">
+                  <option value="cultivated" selected>Cultivado</option>
+                  <option value="purchased">Comprado</option>
+                </select>
+              </label>
+              <label>Plantas<input id="cropPlants" type="number" min="1" value="50"></label>
+              <label>Fase
+                <select id="cropStage">
+                  <option>Plantula</option>
+                  <option selected>Crecimiento</option>
+                  <option>Floracion</option>
+                  <option>Produccion</option>
+                  <option>Descanso</option>
+                </select>
+              </label>
+              <label>Riego cada dias<input id="cropWaterEvery" type="number" min="1" value="2"></label>
+              <label>Hierbas cada dias<input id="cropWeedEvery" type="number" min="1" value="10"></label>
+              <label>Ultimo riego<input id="cropLastWatered" type="date"></label>
+              <label>Ultima limpieza<input id="cropLastWeeded" type="date"></label>
+              <label>Kg por hora estimados<input id="cropYieldHour" type="number" min="1" step="0.5" value="12"></label>
+              <label>Aviso compra dias<input id="cropPurchaseLead" type="number" min="1" max="7" value="3"></label>
+              <div class="form-actions">
+                <button type="submit">Guardar cultivo</button>
+                <button type="button" class="secondary-button" id="cancelCropEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="cropList" class="item-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Plano</p>
+                <h2>Parcelas, secciones y rios</h2>
+              </div>
+            </div>
+            <form class="data-form" id="fieldSectionForm">
+              <input type="hidden" id="fieldSectionEditId">
+              <label>Nombre seccion<input id="fieldSectionName" required placeholder="Parcela norte"></label>
+              <label>Notas<input id="fieldSectionNotes" placeholder="Invernadero, bancal, zona..."></label>
+              <div class="form-actions">
+                <button type="submit">Guardar seccion</button>
+                <button type="button" class="secondary-button" id="cancelSectionEdit">Cancelar</button>
+              </div>
+            </form>
+            <form class="data-form" id="fieldRiverForm">
+              <input type="hidden" id="fieldRiverEditId">
+              <label>Seccion<select id="fieldRiverSection" required></select></label>
+              <label>Rio / linea<input id="fieldRiverName" required placeholder="Rio 1"></label>
+              <label>Capacidad plantas<input id="fieldRiverCapacity" type="number" min="1" value="50"></label>
+              <label>Cultivo<select id="fieldRiverCrop"></select></label>
+              <label>Plantas sembradas<input id="fieldRiverPlants" type="number" min="0" value="0"></label>
+              <label>Fecha plantacion<input id="fieldRiverPlantedAt" type="date"></label>
+              <label>Notas<input id="fieldRiverNotes" placeholder="Marco, variedad, goteros..."></label>
+              <div class="form-actions">
+                <button type="submit">Guardar rio</button>
+                <button type="button" class="secondary-button" id="cancelRiverEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="fieldPlan" class="field-plan"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-orders" aria-labelledby="ordersTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Clientes</p>
+                <h2 id="ordersTitle">Pedidos</h2>
+              </div>
+            </div>
+            <form class="data-form" id="orderForm">
+              <input type="hidden" id="orderEditId">
+              <label>Cliente<input id="orderClient" required placeholder="Restaurante Sol"></label>
+              <label>Producto<select id="orderCrop" required></select></label>
+              <label>Kg<input id="orderKg" type="number" min="0.1" step="0.1" value="5"></label>
+              <label>Fecha<input id="orderDue" type="date" required></label>
+              <label>Zona
+                <select id="orderZone">
+                  <option value="alicante-shops">Tiendas Alicante</option>
+                  <option value="alicante">Alicante</option>
+                  <option value="murcia">Murcia</option>
+                  <option value="cartagena">Cartagena</option>
+                  <option value="other">Otra zona</option>
+                </select>
+              </label>
+              <label>Entrega
+                <select id="orderDelivery">
+                  <option value="auto" selected>Automatico</option>
+                  <option value="agency">Agencia</option>
+                  <option value="own">Ruta propia</option>
+                </select>
+              </label>
+              <label>Prioridad
+                <select id="orderPriority">
+                  <option value="3">Alta</option>
+                  <option value="2" selected>Media</option>
+                  <option value="1">Baja</option>
+                </select>
+              </label>
+              <div class="form-actions">
+                <button type="submit">Guardar pedido</button>
+                <button type="button" class="secondary-button" id="cancelOrderEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="orderList" class="item-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-team" aria-labelledby="teamTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Jornada</p>
+                <h2 id="teamTitle">Equipo</h2>
+              </div>
+            </div>
+            <form class="data-form" id="personForm">
+              <input type="hidden" id="personEditId">
+              <label>Persona<input id="personName" required placeholder="Angel"></label>
+              <label>Minutos disponibles<input id="personMinutes" type="number" min="30" step="15" value="420"></label>
+              <fieldset class="skill-fieldset">
+                <legend>Habilidades</legend>
+                <label><input type="checkbox" value="recoleccion" checked> Recoleccion</label>
+                <label><input type="checkbox" value="riego" checked> Riego</label>
+                <label><input type="checkbox" value="tratamientos" checked> Tratamientos</label>
+                <label><input type="checkbox" value="hierbas" checked> Hierbas</label>
+                <label><input type="checkbox" value="arreglos"> Arreglos</label>
+              </fieldset>
+              <div class="form-actions">
+                <button type="submit">Guardar persona</button>
+                <button type="button" class="secondary-button" id="cancelPersonEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="teamList" class="item-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-tasks" aria-labelledby="tasksTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Trabajo</p>
+                <h2 id="tasksTitle">Tareas manuales</h2>
+              </div>
+            </div>
+            <form class="data-form" id="taskForm">
+              <input type="hidden" id="taskEditId">
+              <label>Tarea<input id="taskTitle" required placeholder="Arreglar gotero sector norte"></label>
+              <label>Tipo
+                <select id="taskType">
+                  <option value="general">General</option>
+                  <option value="repair">Arreglo finca</option>
+                  <option value="admin">Gestion</option>
+                  <option value="harvest">Recoleccion</option>
+                  <option value="water">Riego</option>
+                </select>
+              </label>
+              <label>Fecha limite<input id="taskDue" type="date" required></label>
+              <label>Minutos<input id="taskMinutes" type="number" min="5" step="5" value="45"></label>
+              <label>Prioridad
+                <select id="taskPriority">
+                  <option value="3">Alta</option>
+                  <option value="2" selected>Media</option>
+                  <option value="1">Baja</option>
+                </select>
+              </label>
+              <label>Notas<input id="taskNotes" placeholder="Material, zona, detalle"></label>
+              <div class="form-actions">
+                <button type="submit">Guardar tarea</button>
+                <button type="button" class="secondary-button" id="cancelTaskEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="taskList" class="item-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-products" aria-labelledby="productsTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Ecologico</p>
+                <h2 id="productsTitle">Productos de riego</h2>
+              </div>
+            </div>
+            <form class="data-form" id="productForm">
+              <input type="hidden" id="productEditId">
+              <label>Producto<input id="productName" required placeholder="Jabon potasico"></label>
+              <label>Cultivo<select id="productCrop" required></select></label>
+              <label>Dosis<input id="productDose" required placeholder="2 ml/L"></label>
+              <label>Frecuencia dias<input id="productFrequency" type="number" min="1" value="14"></label>
+              <label>Ultima aplicacion<input id="productLast" type="date"></label>
+              <label>Notas<input id="productNotes" placeholder="Aplicar al atardecer"></label>
+              <div class="form-actions">
+                <button type="submit">Guardar producto</button>
+                <button type="button" class="secondary-button" id="cancelProductEdit">Cancelar</button>
+              </div>
+            </form>
+            <div id="productList" class="item-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-photo" aria-labelledby="photoTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Observacion</p>
+                <h2 id="photoTitle">Consulta por foto</h2>
+              </div>
+            </div>
+            <form class="photo-form" id="photoForm">
+              <label class="photo-drop">
+                <input id="photoInput" type="file" accept="image/*" capture="environment">
+                <span>Subir foto</span>
+                <img id="photoPreview" alt="">
+              </label>
+              <div class="photo-fields">
+                <label>Cultivo<select id="photoCrop"></select></label>
+                <label>Sintoma o insecto
+                  <select id="photoSymptom">
+                    <option value="aphids">Pulgon</option>
+                    <option value="thrips">Trips</option>
+                    <option value="whitefly">Mosca blanca</option>
+                    <option value="caterpillar">Oruga</option>
+                    <option value="mites">Arana roja</option>
+                    <option value="snails">Caracoles o babosas</option>
+                    <option value="fungus">Mancha u hongo</option>
+                    <option value="beneficial">Insecto beneficioso</option>
+                    <option value="unknown">No lo se</option>
+                  </select>
+                </label>
+                <label>Severidad
+                  <select id="photoSeverity">
+                    <option value="1">Baja</option>
+                    <option value="2" selected>Media</option>
+                    <option value="3">Alta</option>
+                  </select>
+                </label>
+                <label>Notas<textarea id="photoNotes" rows="4" placeholder="Hojas afectadas, zona, cantidad, clima reciente"></textarea></label>
+                <button type="submit">Analizar y guardar</button>
+              </div>
+            </form>
+            <div id="photoResult" class="diagnostic-box"></div>
+            <div id="observationList" class="item-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-settings" aria-labelledby="settingsTitle">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Sistema</p>
+                <h2 id="settingsTitle">Ajustes</h2>
+              </div>
+            </div>
+            <form class="data-form" id="settingsForm">
+              <label>Nombre finca<input id="settingFarmName" required></label>
+              <label>Latitud<input id="settingLat" type="number" step="0.000001" placeholder="36.7213"></label>
+              <label>Longitud<input id="settingLon" type="number" step="0.000001" placeholder="-4.4214"></label>
+              <label>Inicio jornada<input id="settingStart" type="time"></label>
+              <label>Fin jornada<input id="settingEnd" type="time"></label>
+              <label>Descanso cada minutos<input id="settingRestEvery" type="number" min="60" step="15"></label>
+              <label>Minutos descanso<input id="settingBreak" type="number" min="5" step="5"></label>
+              <label>Hora aviso<input id="settingNotifyHour" type="time"></label>
+              <label>Apps Script URL<input id="settingSheetUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
+              <label>Token hoja<input id="settingSheetToken" placeholder="Opcional, el mismo del Apps Script"></label>
+              <label>Pestana productos<input id="settingProductsTab" placeholder="PRODUCTOS DISPONIBLES"></label>
+              <label>Pestana pedidos<input id="settingOrdersTab" placeholder="VENTA"></label>
+              <label>Pestana lineas pedido<input id="settingSaleLinesTab" placeholder="VENTAS"></label>
+              <label>Pestana clientes<input id="settingClientsTab" placeholder="CLIENTES"></label>
+              <label>Pestana recoleccion<input id="settingHarvestTab" placeholder="LISTA RECOLECTA"></label>
+              <label>Supabase URL<input id="settingSupabaseUrl" type="url" placeholder="https://xxxx.supabase.co"></label>
+              <label>Supabase anon key<input id="settingSupabaseKey" placeholder="Clave publica anon"></label>
+              <div class="form-actions">
+                <button type="submit">Guardar ajustes</button>
+                <button type="button" class="secondary-button" id="testNotifyBtn">Probar aviso</button>
+              </div>
+            </form>
+            <div class="cloud-box">
+              <div>
+                <p class="eyebrow">Nube</p>
+                <h3 id="cloudStatus">Modo local</h3>
+              </div>
+              <div class="cloud-actions">
+                <input id="cloudEmail" type="email" placeholder="email para entrar">
+                <button class="secondary-button" id="cloudLoginBtn">Entrar</button>
+                <button class="secondary-button" id="cloudSyncBtn">Sincronizar</button>
+                <button class="secondary-button" id="cloudLogoutBtn">Salir</button>
+              </div>
+            </div>
+            <div class="settings-actions">
+              <button class="secondary-button" id="exportBtn">Exportar memoria</button>
+              <label class="secondary-button import-label">Importar memoria<input id="importInput" type="file" accept="application/json"></label>
+              <button class="danger-button" id="resetBtn">Reiniciar demo</button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" data-nav aria-label="Navegacion movil">
+      <button class="nav-button is-active" data-view="dashboard">Hoy</button>
+      <button class="nav-button" data-view="assistant">Chat</button>
+      <button class="nav-button" data-view="orders">Pedidos</button>
+      <button class="nav-button" data-view="crops">Cultivos</button>
+      <button class="nav-button" data-view="team">Equipo</button>
+      <button class="nav-button" data-view="tasks">Tareas</button>
+      <button class="nav-button" data-view="products">Producto</button>
+      <button class="nav-button" data-view="photo">Foto</button>
+      <button class="nav-button" data-view="settings">Ajustes</button>
+    </nav>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="cloud-config.js"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onload="window.dispatchEvent(new Event('supabase-ready'))"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

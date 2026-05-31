@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="FincaBot">
+  <rect width="96" height="96" rx="22" fill="#1f7a4d"/>
+  <path d="M18 65c13-18 47-18 60 0" fill="none" stroke="#f7f8fb" stroke-width="8" stroke-linecap="round"/>
+  <path d="M22 50c10-14 42-14 52 0" fill="none" stroke="#b9dfc8" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="36" cy="34" r="7" fill="#f4c95d"/>
+  <circle cx="60" cy="34" r="7" fill="#f4c95d"/>
+  <path d="M35 76h26" stroke="#f7f8fb" stroke-width="7" stroke-linecap="round"/>
+</svg>
