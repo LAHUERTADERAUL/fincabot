@@ -1,4 +1,4 @@
-const CACHE_NAME = "fincabot-v6";
+const CACHE_NAME = "fincabot-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -25,10 +25,20 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
-  );
+  event.respondWith(networkFirst(event.request));
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) cache.put(request, response.clone());
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    return cached || caches.match("./index.html");
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

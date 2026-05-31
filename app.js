@@ -341,6 +341,7 @@
       saveState();
     });
     byId("exportBtn").addEventListener("click", exportMemory);
+    byId("updateAppBtn").addEventListener("click", updateAppCache);
     byId("resetBtn").addEventListener("click", resetDemo);
     byId("quickActions").addEventListener("click", (event) => {
       const button = event.target.closest("button[data-prompt]");
@@ -1825,7 +1826,26 @@
 
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then((registration) => {
+      registration.update().catch(() => {});
+    }).catch(() => {});
+  }
+
+  async function updateAppCache() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.update()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((key) => key.startsWith("fincabot-")).map((key) => caches.delete(key)));
+      }
+      toast("App actualizada");
+      setTimeout(() => location.reload(), 600);
+    } catch (error) {
+      toast(`No se pudo actualizar: ${error.message}`);
+    }
   }
 
   async function enableNotifications() {
